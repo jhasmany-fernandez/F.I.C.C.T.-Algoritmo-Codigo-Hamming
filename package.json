@@ -1,0 +1,28 @@
+{
+  "name": "f.i.c.c.t.-algoritmo-codigo-hamming",
+  "version": "1.0.0",
+  "description": "## Codigo",
+  "main": "hamming.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "ts-node-dev --respawn src/server.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhasmany-fernandez/F.I.C.C.T.-Algoritmo-Codigo-Hamming.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jhasmany-fernandez/F.I.C.C.T.-Algoritmo-Codigo-Hamming/issues"
+  },
+  "homepage": "https://github.com/jhasmany-fernandez/F.I.C.C.T.-Algoritmo-Codigo-Hamming#readme",
+  "dependencies": {
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.15.18",
+    "express": "^5.1.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.8.3"
+  }
+}

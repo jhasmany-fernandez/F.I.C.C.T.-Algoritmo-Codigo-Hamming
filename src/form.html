@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title>Formulario Hamming</title>
+</head>
+<body>
+    <h1>Formulario para código Hamming</h1>
+    <form action="/submit" method="post">
+        <label for="dataBits">Bits de datos (ejemplo: 0101001):</label><br />
+        <input type="text" id="dataBits" name="dataBits" pattern="[01]+" required />
+        <br /><br />
+        <button type="submit">Enviar</button>
+    </form>
+</body>
+</html>
