@@ -3,7 +3,6 @@ import path from "path";
 import {
   calculateParityBits,
   isPowerOfTwo,
-  encodeHamming,
   detectAndCorrect,
 } from "./hamming/hamming";
 
@@ -18,60 +17,153 @@ interface SubmitBody {
   action: "encode" | "decode";
 }
 
-// Función para generar la tabla estilo matriz de codificación Hamming
-function generateHammingMatrixTable(dataBits: number[]): string {
+function generateHammingMatrixTableDetailed(dataBits: number[]): string {
+  // --- función completa aquí (como arriba) ---
+  // (La versión completa está arriba, reemplaza aquí)
   const m = dataBits.length;
   const r = calculateParityBits(m);
   const n = m + r;
-  const code = encodeHamming(dataBits);
 
-  // Generar fila de posiciones en binario y decimal
-  let html = "<table border='1' cellpadding='5' cellspacing='0'><thead><tr><th>Posición</th>";
+  const code: number[] = Array(n).fill(0);
+  let dataPos = 0;
+
+  for (let i = 0; i < n; i++) {
+    if (!isPowerOfTwo(i + 1)) {
+      code[i] = dataBits[dataPos++];
+    }
+  }
+
+  function getControlledPositions(parityPos: number): number[] {
+    let positions = [];
+    for (let pos = 1; pos <= n; pos++) {
+      if ((pos & parityPos) !== 0) {
+        positions.push(pos);
+      }
+    }
+    return positions;
+  }
+
+  let html = `<style>
+    table { border-collapse: collapse; margin-bottom: 10px; }
+    th, td { border: 1px solid black; padding: 5px; text-align: center; font-family: Arial, sans-serif; }
+    th { font-weight: bold; }
+    td.position { font-weight: bold; }
+    .step { margin-bottom: 20px; }
+  </style>`;
+
+  html += `<h4>Estructura base</h4>`;
+  html += `<table><thead><tr><th></th>`;
   for (let i = 1; i <= n; i++) {
-    const binPos = i.toString(2).padStart(4, "0");
-    // Mostrar p o d según sea paridad o dato, y binario + decimal
+    const binPos = i.toString(2).padStart(r, "0");
     if (isPowerOfTwo(i)) {
       html += `<th>p<sub>${Math.log2(i) + 1}</sub><br>${binPos}<br>(${i})</th>`;
     } else {
-      const dataIndex = i - 1 - Math.floor(Math.log2(i)); // solo para etiqueta d (no exacto, pero para ilustrar)
-      html += `<th>d<br>${binPos}<br>(${i})</th>`;
+      html += `<th>d<sub>${i}</sub><br>${binPos}<br>(${i})</th>`;
     }
   }
-  html += "</tr></thead><tbody>";
+  html += `</tr></thead><tbody>`;
 
-  // Fila palabra original (solo datos en sus posiciones)
-  html += "<tr><td>Palabra original</td>";
-  for (let i = 1, dataIdx = 0; i <= n; i++) {
-    if (isPowerOfTwo(i)) {
-      html += "<td></td>";
+  html += `<tr><td>Posición</td>`;
+  for (let i = 1; i <= n; i++) {
+    const binPos = i.toString(2).padStart(4, "0");
+    html += `<td>${binPos}</td>`;
+  }
+  html += `</tr>`;
+
+  html += `<tr><td>Palabra original</td>`;
+  for (let i = 0; i < n; i++) {
+    if (isPowerOfTwo(i + 1)) {
+      html += `<td></td>`;
     } else {
-      html += `<td>${dataBits[dataIdx++]}</td>`;
+      html += `<td>${code[i]}</td>`;
     }
   }
-  html += "</tr>";
+  html += `</tr></tbody></table>`;
 
-  // Filas para cada bit de paridad mostrando qué posiciones controla (1 o vacío)
   for (let i = 0; i < r; i++) {
     const parityPos = Math.pow(2, i);
+    const controlledPositions = getControlledPositions(parityPos);
+
+    let onesCount = 0;
+    for (const pos of controlledPositions) {
+      if (pos === parityPos) continue;
+      if (code[pos - 1] === 1) onesCount++;
+    }
+
+    const parity = (onesCount % 2 === 0) ? 0 : 1;
+    code[parityPos - 1] = parity;
+
+    html += `<div class="step"><h4>Cálculo bit paridad p<sub>${i + 1}</sub> (posición ${parityPos})</h4>`;
+    html += `<table><thead><tr>`;
+    for (let pos = 1; pos <= n; pos++) {
+      html += `<th>${pos}</th>`;
+    }
+    html += `<th>Paridad p<sub>${i + 1}</sub></th>`;
+    html += `</tr></thead><tbody><tr>`;
+    for (let pos = 1; pos <= n; pos++) {
+      if (controlledPositions.includes(pos)) {
+        html += `<td>${code[pos - 1]}</td>`;
+      } else {
+        html += `<td>&nbsp;</td>`;
+      }
+    }
+    html += `<td><b>${parity}</b></td>`;
+    html += `</tr></tbody></table>`;
+    html += `<p>Bit de paridad p<sub>${i + 1}</sub> colocado en posición ${parityPos} con valor ${parity}.</p>`;
+    html += `</div>`;
+  }
+
+  html += `<h3>Palabra codificada completa</h3>`;
+  html += `<table><thead><tr><th></th>`;
+  for (let i = 1; i <= n; i++) {
+    const binPos = i.toString(2).padStart(r, "0");
+    if (isPowerOfTwo(i)) {
+      html += `<th>p<sub>${Math.log2(i) + 1}</sub><br>${binPos}<br>(${i})</th>`;
+    } else {
+      html += `<th>d<sub>${i}</sub><br>${binPos}<br>(${i})</th>`;
+    }
+  }
+  html += `</tr></thead><tbody>`;
+
+  html += `<tr><td>Posición</td>`;
+  for (let i = 1; i <= n; i++) {
+    const binPos = i.toString(2).padStart(4, "0");
+    html += `<td>${binPos}</td>`;
+  }
+  html += `</tr>`;
+
+  html += `<tr><td>Palabra original</td>`;
+  for (let i = 0; i < n; i++) {
+    if (isPowerOfTwo(i + 1)) {
+      html += `<td></td>`;
+    } else {
+      html += `<td>${code[i]}</td>`;
+    }
+  }
+  html += `</tr>`;
+
+  for (let i = 0; i < r; i++) {
+    const parityPos = Math.pow(2, i);
+    const controlledPositions = getControlledPositions(parityPos);
+
     html += `<tr><td>p<sub>${i + 1}</sub></td>`;
-    for (let j = 1; j <= n; j++) {
-      if ((j & parityPos) !== 0) {
-        html += `<td>1</td>`;
+    for (let pos = 1; pos <= n; pos++) {
+      if (pos === parityPos) {
+        html += `<td><b>${code[pos - 1]}</b></td>`;
+      } else if (controlledPositions.includes(pos)) {
+        html += `<td>${code[pos - 1]}</td>`;
       } else {
         html += `<td></td>`;
       }
     }
-    html += "</tr>";
+    html += `</tr>`;
   }
 
-  // Fila palabra codificada con paridad
-  html += "<tr><td>Palabra + paridad</td>";
+  html += `<tr><td>Palabra+paridad</td>`;
   for (let i = 0; i < n; i++) {
     html += `<td>${code[i]}</td>`;
   }
-  html += "</tr>";
-
-  html += "</tbody></table>";
+  html += `</tr></tbody></table>`;
 
   return html;
 }
@@ -93,10 +185,8 @@ app.post("/submit", (req: Request, res: Response): void => {
 
   if (action === "encode") {
     const data = dataBits.split("").map(Number);
-    // Aquí generamos la tabla en el nuevo formato
-    const tableHtml = generateHammingMatrixTable(data);
-
-    html += `<h3>Codificación paso a paso</h3>`;
+    const tableHtml = generateHammingMatrixTableDetailed(data);
+    html += `<h3>Codificación paso a paso detallada</h3>`;
     html += tableHtml;
 
   } else if (action === "decode") {
