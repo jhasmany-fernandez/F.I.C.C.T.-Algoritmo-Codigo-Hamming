@@ -18,9 +18,68 @@ interface SubmitBody {
   action: "encode" | "decode";
 }
 
+// Función para generar la tabla estilo matriz de codificación Hamming
+function generateHammingMatrixTable(dataBits: number[]): string {
+  const m = dataBits.length;
+  const r = calculateParityBits(m);
+  const n = m + r;
+  const code = encodeHamming(dataBits);
+
+  // Generar fila de posiciones en binario y decimal
+  let html = "<table border='1' cellpadding='5' cellspacing='0'><thead><tr><th>Posición</th>";
+  for (let i = 1; i <= n; i++) {
+    const binPos = i.toString(2).padStart(4, "0");
+    // Mostrar p o d según sea paridad o dato, y binario + decimal
+    if (isPowerOfTwo(i)) {
+      html += `<th>p<sub>${Math.log2(i) + 1}</sub><br>${binPos}<br>(${i})</th>`;
+    } else {
+      const dataIndex = i - 1 - Math.floor(Math.log2(i)); // solo para etiqueta d (no exacto, pero para ilustrar)
+      html += `<th>d<br>${binPos}<br>(${i})</th>`;
+    }
+  }
+  html += "</tr></thead><tbody>";
+
+  // Fila palabra original (solo datos en sus posiciones)
+  html += "<tr><td>Palabra original</td>";
+  for (let i = 1, dataIdx = 0; i <= n; i++) {
+    if (isPowerOfTwo(i)) {
+      html += "<td></td>";
+    } else {
+      html += `<td>${dataBits[dataIdx++]}</td>`;
+    }
+  }
+  html += "</tr>";
+
+  // Filas para cada bit de paridad mostrando qué posiciones controla (1 o vacío)
+  for (let i = 0; i < r; i++) {
+    const parityPos = Math.pow(2, i);
+    html += `<tr><td>p<sub>${i + 1}</sub></td>`;
+    for (let j = 1; j <= n; j++) {
+      if ((j & parityPos) !== 0) {
+        html += `<td>1</td>`;
+      } else {
+        html += `<td></td>`;
+      }
+    }
+    html += "</tr>";
+  }
+
+  // Fila palabra codificada con paridad
+  html += "<tr><td>Palabra + paridad</td>";
+  for (let i = 0; i < n; i++) {
+    html += `<td>${code[i]}</td>`;
+  }
+  html += "</tr>";
+
+  html += "</tbody></table>";
+
+  return html;
+}
+
 app.get("/", (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "form.html"));
 });
+
 app.post("/submit", (req: Request, res: Response): void => {
   const { dataBits, action } = req.body as SubmitBody;
 
@@ -34,36 +93,15 @@ app.post("/submit", (req: Request, res: Response): void => {
 
   if (action === "encode") {
     const data = dataBits.split("").map(Number);
-    const encoded = encodeHamming(data);
+    // Aquí generamos la tabla en el nuevo formato
+    const tableHtml = generateHammingMatrixTable(data);
 
     html += `<h3>Codificación paso a paso</h3>`;
-    html += `<p>Bits de datos (m): ${data.length}</p>`;
-    const r = calculateParityBits(data.length);
-    html += `<p>Bits de paridad calculados (r): ${r}</p>`;
-    html += `<p>Longitud total (n = m + r): ${data.length + r}</p>`;
-
-    html += `<table border="1" cellpadding="5" cellspacing="0">
-      <thead><tr><th>Posición</th><th>Tipo</th><th>Valor</th></tr></thead><tbody>`;
-
-    for (let i = 0; i < encoded.length; i++) {
-      const pos = i + 1;
-      let tipo = "";
-      if (isPowerOfTwo(pos)) {
-        tipo = `Paridad p<sub>${Math.log2(pos) + 1}</sub>`;
-      } else {
-        const di = data
-          .slice(0, i + 1)
-          .filter((_, idx) => !isPowerOfTwo(idx + 1)).length;
-        tipo = `Dato d<sub>${di}</sub>`;
-      }
-      html += `<tr><td>${pos}</td><td>${tipo}</td><td>${encoded[i]}</td></tr>`;
-    }
-    html += "</tbody></table>";
+    html += tableHtml;
 
   } else if (action === "decode") {
     const code = dataBits.split("").map(Number);
 
-    // Opcional: validar longitud mínima
     if (code.length < 3) {
       res.status(400).send("Error: La palabra codificada es demasiado corta para procesar.");
       return;
