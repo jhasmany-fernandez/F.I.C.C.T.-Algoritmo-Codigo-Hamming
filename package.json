@@ -5,7 +5,9 @@
   "main": "hamming.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "ts-node-dev --respawn src/server.ts"
+    "dev": "ts-node-dev --respawn src/server.ts",
+    "start": "node hamming.js",
+    "start:dev": "ts-node-dev --respawn src/server.ts"
   },
   "repository": {
     "type": "git",
