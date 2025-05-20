@@ -172,6 +172,138 @@ app.get("/", (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "form.html"));
 });
 
+function generateHammingDecodeTableDetailed(code: number[]): string {
+  const n = code.length;
+  let r = 0;
+  while (Math.pow(2, r) < n + 1) {
+    r++;
+  }
+
+  function getControlledPositions(parityPos: number): number[] {
+    let positions = [];
+    for (let pos = 1; pos <= n; pos++) {
+      if ((pos & parityPos) !== 0) {
+        positions.push(pos);
+      }
+    }
+    return positions;
+  }
+
+  let syndrome = 0;
+  const parityChecks: { parityPos: number; parityCalc: number; storedParity: number; checkResult: string }[] = [];
+
+  for (let i = 0; i < r; i++) {
+  const parityPos = Math.pow(2, i);
+
+  let parityExpected = 0;
+  for (let pos = 1; pos <= n; pos++) {
+    if ((pos & parityPos) !== 0 && pos !== parityPos) {
+      parityExpected ^= code[pos - 1];
+    }
+  }
+
+  const storedParity = code[parityPos - 1];
+  const checkOk = parityExpected === storedParity;
+  if (!checkOk) {
+    syndrome |= parityPos;
+  }
+  parityChecks.push({
+    parityPos,
+    parityCalc: parityExpected,
+    storedParity,
+    checkResult: checkOk ? "OK (0)" : "Error (1)",
+  });
+}
+
+
+  let html = `<style>
+    table { border-collapse: collapse; margin-bottom: 10px; }
+    th, td { border: 1px solid black; padding: 5px; text-align: center; font-family: Arial, sans-serif; }
+    th { font-weight: bold; }
+  </style>`;
+
+  html += `<h4>Palabra recibida</h4>`;
+  html += `<table><thead><tr><th>Posición</th>`;
+  for (let i = 1; i <= n; i++) {
+    html += `<th>${i}</th>`;
+  }
+  html += `</tr></thead><tbody><tr><td>Bits</td>`;
+  for (let i = 0; i < n; i++) {
+    html += `<td>${code[i]}</td>`;
+  }
+  html += `</tr></tbody></table>`;
+
+  html += `<h4>Cálculo y verificación de bits de paridad</h4>`;
+  html += `<table><thead><tr><th>Paridad</th>`;
+  for (let i = 1; i <= n; i++) {
+    html += `<th>${i}</th>`;
+  }
+  html += `<th>Paridad calculada</th><th>Paridad almacenada</th><th>Comprobación</th><th>Unos en bits controlados</th></tr></thead><tbody>`;
+
+  for (const { parityPos, parityCalc, storedParity, checkResult } of parityChecks) {
+  const controlledPositions = getControlledPositions(parityPos);
+
+  // Contar unos en bits controlados excluyendo bit paridad almacenado
+  let onesCount = 0;
+  for (const pos of controlledPositions) {
+    if (pos !== parityPos && code[pos - 1] === 1) {
+      onesCount++;
+    }
+  }
+
+  const rowStyle = checkResult.startsWith("Error") ? ' style="background-color:#fdd;"' : "";
+
+  html += `<tr${rowStyle}><td>p<sub>${Math.log2(parityPos) + 1}</sub></td>`;
+
+  for (let pos = 1; pos <= n; pos++) {
+    if (controlledPositions.includes(pos)) {
+      if (pos === parityPos) {
+        // Mostrar el bit esperado (paridad calculada) en la posición de paridad
+        html += `<td><b>${parityCalc}</b></td>`;
+      } else {
+        // Mostrar el bit recibido en las demás posiciones controladas
+        html += `<td>${code[pos - 1]}</td>`;
+      }
+    } else {
+      html += `<td></td>`;
+    }
+  }
+
+  html += `<td><b>${parityCalc}</b></td><td><b>${storedParity}</b></td><td>${checkResult}</td><td>${onesCount} unos</td></tr>`;
+}
+
+  html += `</tbody></table>`;
+
+  html += `<h4>Síndrome y corrección</h4>`;
+  if (syndrome === 0) {
+    html += `<p>No se detectó ningún error. Síndrome = 0</p>`;
+  } else if (syndrome <= n) {
+    html += `<p>Error detectado en la posición <b>${syndrome}</b>.</p>`;
+    const correctedCode = [...code];
+    correctedCode[syndrome - 1] ^= 1;
+    html += `<p>Palabra corregida: <b>${correctedCode.join("")}</b></p>`;
+
+    html += `<table><thead><tr><th>Posición</th>`;
+    for (let i = 1; i <= n; i++) {
+      html += `<th>${i}</th>`;
+    }
+    html += `</tr></thead><tbody><tr><td>Bits corregidos</td>`;
+    for (let i = 0; i < n; i++) {
+      html += `<td>${correctedCode[i]}</td>`;
+    }
+    html += `</tr></tbody></table>`;
+
+    const dataBitsOnly = correctedCode.filter((_, i) => !isPowerOfTwo(i + 1));
+    html += `<p>Bits de datos extraídos: <b>${dataBitsOnly.join("")}</b></p>`;
+
+  } else {
+    html += `<p>Error detectado, pero el síndrome no es válido para corrección.</p>`;
+  }
+
+  return html;
+}
+
+
 app.post("/submit", (req: Request, res: Response): void => {
   const { dataBits, action } = req.body as SubmitBody;
 
@@ -193,20 +325,15 @@ app.post("/submit", (req: Request, res: Response): void => {
     const code = dataBits.split("").map(Number);
 
     if (code.length < 3) {
-      res.status(400).send("Error: La palabra codificada es demasiado corta para procesar.");
-      return;
-    }
+    res.status(400).send("Error: La palabra codificada es demasiado corta para procesar.");
+    return;
+  }
 
-    const [corrected, message] = detectAndCorrect(code);
+    const tableHtml = generateHammingDecodeTableDetailed(code);
+    html += `<h3>Detección y corrección paso a paso</h3>`;
+    html += tableHtml;
 
-    html += `<h3>Detección y corrección de errores</h3>`;
-    html += `<p>${message}</p>`;
-
-    if (corrected) {
-      html += `<p><b>Palabra corregida:</b> ${corrected.join("")}</p>`;
-      const dataBitsOnly = corrected.filter((_, i) => !isPowerOfTwo(i + 1));
-      html += `<p><b>Bits de datos extraídos:</b> ${dataBitsOnly.join("")}</p>`;
-    }
+    
   } else {
     res.status(400).send("Acción inválida.");
     return;
